@@ -252,6 +252,14 @@
     mounted() {
       this.checkTourStatus();
       this.initTour();
+      // Start tour automatically if not completed
+      if (!this.hasCompletedOnboarding) {
+        const savedStep = localStorage.getItem("tour_current_step");
+        if (savedStep) {
+          this.currentStep = parseInt(savedStep);
+          this.startOnboarding();
+        }
+      }
     },
     methods: {
       initTour() {
@@ -266,7 +274,17 @@
             theme: "light",
             zIndex: 9999,
             onShow: (instance) => {
+              // Add highlight class to target element
+              instance.reference.classList.add("tour-highlight");
               this.handleStepChange(index);
+
+              // Scroll adjustment
+              instance.reference.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+                inline: "center",
+              });
+
               instance.popper.querySelectorAll("button").forEach((button) => {
                 button.addEventListener("click", (e) => {
                   const action = e.target.dataset.action;
@@ -275,6 +293,10 @@
                   if (action === "finish" || action === "skip") this.endTour();
                 });
               });
+            },
+            onHide: (instance) => {
+              // Remove highlight class
+              instance.reference.classList.remove("tour-highlight");
             },
           });
         });
@@ -288,6 +310,15 @@
             instance.hide();
           }
         });
+        // Save current step
+        localStorage.setItem("tour_current_step", index);
+      },
+
+      createOverlay() {
+        const overlay = document.createElement("div");
+        overlay.className = "tour-overlay";
+        overlay.style.backdropFilter = "blur(3px)";
+        document.body.appendChild(overlay);
       },
       createStepContent(index) {
         return `
@@ -332,21 +363,12 @@
 
       endTour() {
         this.isTourActive = false;
-        this.hasCompletedOnboarding = true;
-        // Replace this line:
-        // this.steps.forEach((step) => tippy(step.target).hide());
-        // With:
+        this.hasCompletedOnboarding = false; // Demo mode: always keep false
         this.tippyInstances.forEach((instance) => instance.hide());
         this.removeOverlay();
-        localStorage.setItem("kolibri_tour_completed", "true");
+        // Clear saved step for demo purposes
+        localStorage.removeItem("tour_current_step");
       },
-
-      createOverlay() {
-        const overlay = document.createElement("div");
-        overlay.className = "tour-overlay";
-        document.body.appendChild(overlay);
-      },
-
       removeOverlay() {
         const overlay = document.querySelector(".tour-overlay");
         if (overlay) overlay.remove();
@@ -372,8 +394,10 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
     z-index: 9990;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    background: rgba(255, 255, 255, 0.7) !important;
   }
 
   .tour-content {
@@ -414,6 +438,14 @@
     background: #f3f4f6;
     color: #4b5563;
   }
+  .tour-highlight {
+    box-shadow: 0 0 0 3px #2563eb !important;
+    border-radius: 8px;
+    position: relative;
+    z-index: 9992;
+    background: white;
+    animation: pulse-glow 1.5s infinite;
+  }
 
   /* Pulse animation */
   [data-tippy-root] .tippy-box {
@@ -431,10 +463,25 @@
     animation: pulse 2s infinite;
     z-index: -1;
   }
+  [data-tippy-root] {
+    z-index: 9993; /* Ensure tooltip is above overlay */
+  }
 
   @keyframes pulse {
     0% {
       box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5);
+    }
+    70% {
+      box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0% {
+      box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
     }
     70% {
       box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
